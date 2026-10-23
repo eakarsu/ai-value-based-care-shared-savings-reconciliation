@@ -1,0 +1,8 @@
+import test from "node:test"; import assert from "node:assert/strict";
+// No provider keys are read by domainAi.mjs; tests run fully offline.
+delete process.env.OPENROUTER_API_KEY;
+const { filterRecords, recordsToCsv, recordsToJson, buildDomainInsights } = await import("../domainAi.mjs");
+const rows=[{id:1,reference:"A-1",title:"Alpha case",status:"Open",owner:"Sam",risk:"High",due_date:"2020-01-01",amount:0,payload:{evidenceState:"Complete",verified:false}},{id:2,reference:"B-2",title:"Beta",status:"Closed",owner:"Jo",risk:"Low",due_date:"2999-01-01",amount:50,payload:{}}];
+test("search/filter on main list",()=>{ assert.equal(filterRecords(rows,{q:"alpha"}).length,1); assert.equal(filterRecords(rows,{status:"Closed"}).length,1); assert.equal(filterRecords(rows,{risk:"High"})[0].reference,"A-1"); });
+test("CSV/JSON export preserves false/0/empty",()=>{ const csv=recordsToCsv(rows); assert.ok(csv.includes("A-1") && csv.includes(",0,")); assert.ok(recordsToCsv([{id:3,reference:"",title:"",status:"Open",amount:0,payload:{verified:false}}]).includes("false")); const json=JSON.parse(recordsToJson(rows)); assert.equal(json[0].amount,0); assert.equal(json[0].payload.verified,false); });
+test("deterministic fallback insights are labelled aiGenerated:false and preserve zero",()=>{ const out=buildDomainInsights([], new Date("2026-01-01")); assert.equal(out.aiGenerated,false); assert.equal(out.sections.length,3); assert.equal(out.metrics.records,0); assert.equal(out.metrics.overdue,0); const hit=buildDomainInsights(rows,new Date("2026-01-01")); assert.equal(hit.sections[1].count,1); });
